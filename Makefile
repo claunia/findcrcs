@@ -1,24 +1,123 @@
 BINARY := findcrcs
 
+DISTNAME := $(shell pwd | awk -F '/' '{print $$(NF)}')
+BINPREFIX :=
+EXEFLAGS :=
+CLEAN :=
 ifeq ($(OS), Windows_NT)
-	BINARY := $(BINARY).exe
+  CLEAN := $(BINARY)
+  BINARY := $(BINARY).exe
+  EXEFLAGS := -static
+  ifeq ($(64), 1)
+    BINPREFIX := x86_64-w64-mingw32-
+  endif
 endif
 
-all: findcrcs
+all:
+ifeq ($(OS), Windows_NT)
+	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null || make --no-print-directory clean; exit 0)
+endif
+	@make --no-print-directory $(BINARY)
+
+64:
+ifeq ($(OS), Windows_NT)
+	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null && make --no-print-directory clean; exit 0)
+	@make --no-print-directory $(BINARY) 64=1
+else
+	@make --no-print-directory $(BINARY)
+endif
 
 clean:
-	rm $(BINARY)
+	rm -rf $(BINARY) $(CLEAN) crcutil.a *.o *.exe test.bin d1aa92b05d1f2638f423661ae4735446.bin
 
-findcrcs: findcrcs.cc md5.c md5.h crcutil-1.0
-	g++ -O3 -Wall -mcrc32 -o $(BINARY) findcrcs.cc md5.c crcutil-1.0/examples/interface.cc crcutil-1.0/code/*.cc -Icrcutil-1.0/code -Icrcutil-1.0/tests -Icrcutil-1.0/examples
-	strip $(BINARY)
+mrproper:
+	@make --no-print-directory clean
+	rm -rf test.bin *.tar.gz *.zip $(DISTNAME)-bin-win32 $(DISTNAME)-bin-win64
 
-crcutil-1.0: crcutil-1.0.tar.gz
-	tar xfz crcutil-1.0.tar.gz
+dist:
+	make mrproper
+	(cd ..; tar -cz --numeric-owner -f $(DISTNAME).tar.gz $(DISTNAME))
+	mv ../$(DISTNAME).tar.gz .
+ifeq ($(OS), Windows_NT)
+	mkdir $(DISTNAME)-bin-win32
+	make all
+	cp $(BINARY) $(DISTNAME)-bin-win32
+	cp README $(DISTNAME)-bin-win32/README.txt
+	cp COPYING $(DISTNAME)-bin-win32/COPYING.txt
+	unix2dos $(DISTNAME)-bin-win32/README.txt
+	unix2dos $(DISTNAME)-bin-win32/COPYING.txt
+	zip -r $(DISTNAME)-bin-win32.zip $(DISTNAME)-bin-win32
+	rm -rf $(DISTNAME)-bin-win32
+	make clean
+	mkdir $(DISTNAME)-bin-win64
+	make all 64=1
+	cp $(BINARY) $(DISTNAME)-bin-win64
+	cp README $(DISTNAME)-bin-win64/README.txt
+	cp COPYING $(DISTNAME)-bin-win64/COPYING.txt
+	unix2dos $(DISTNAME)-bin-win64/README.txt
+	unix2dos $(DISTNAME)-bin-win64/COPYING.txt
+	zip -r $(DISTNAME)-bin-win64.zip $(DISTNAME)-bin-win64
+	rm -rf $(DISTNAME)-bin-win64
+	make clean
+endif
+
+test: $(BINARY) test.bin
+	@echo ""
+	@echo "return should be: 100000000  13fbda0d  d1aa92b05d1f2638f423661ae4735446"
+	@echo "time ./$(BINARY) test.bin 1000000 13fbda0d"
+	@echo ""
+	@sh -c "time ./$(BINARY) test.bin 1000000 13fbda0d"
+
+$(BINARY): findcrcs.cc md5.c md5.h crcutil-1.0 crcutil.a
+	$(BINPREFIX)g++ -O3 -D_FILE_OFFSET_BITS=64 -Wall -o $@ $(EXEFLAGS) findcrcs.cc md5.c crcutil.a -Icrcutil-1.0/code -Icrcutil-1.0/examples
+	$(BINPREFIX)strip -s $@
+
+crcutil.a: crcutil-1.0
+	rm -rf *.o
+	$(BINPREFIX)g++ -O3 -Wall -mcrc32 -c crcutil-1.0/examples/interface.cc crcutil-1.0/code/*.cc -Icrcutil-1.0/code -Icrcutil-1.0/tests -Icrcutil-1.0/examples
+	$(BINPREFIX)ar r crcutil.a *.o
+	rm -rf *.o
+
+crcutil-1.0:
+	wget -q -O - http://crcutil.googlecode.com/files/crcutil-1.0.tar.gz | tar xfz -
 	chmod -R og-w+rX crcutil-1.0
 	chown -R 0.0 crcutil-1.0
 	touch crcutil-1.0
 
-crcutil-1.0.tar.gz:
-	wget -q -O - http://crcutil.googlecode.com/files/crcutil-1.0.tar.gz > crcutil-1.0.tar.gz
-	touch crcutil-1.0.tar.gz
+test.bin:
+	@echo "creating test.bin"
+	@(echo -en \
+	"\x1f\x8b\x08\x00\x6d\xe2\x4a\x51\x02\x03\x93\xef\xe6\x60\xc8\x7d"\
+	"\xe4\x15\xc8\xc4\xfc\xf6\xee\x5e\xaf\xd9\x81\x32\xc7\x3f\x4e\x16"\
+	"\x3f\xe1\xcc\xb5\x4f\x64\x4e\xd2\x5b\xe6\xbc\xb8\x86\x1d\x1c\x85"\
+	"\x85\x2f\xa6\x34\xbd\xd5\x6a\x0c\xd2\x50\xda\x61\x2d\x21\xba\x5b"\
+	"\x44\x71\xfa\x03\x8d\xd8\x24\xf6\x74\x4f\xb5\xfc\x05\x3f\x8c\x3c"\
+	"\x4f\x86\xdd\x3e\xe8\xa8\xe5\x31\xef\xd3\x9c\xec\x17\x45\x2f\x9e"\
+	"\x1b\xcf\xfd\x69\xfd\xff\xc7\xfc\xeb\xf1\x9b\x36\xfc\x7d\x7c\xf6"\
+	"\x76\xd6\xdb\xba\x88\x95\x2d\x02\x55\x7f\x4f\x3e\x28\xbf\xc6\xc3"\
+	"\x00\x01\x0e\x8f\xaa\xcc\xdb\xb7\x16\xf1\x08\x7c\x7a\x94\xb5\xf7"\
+	"\x33\x1f\x54\xd4\x23\xb6\xbc\x6a\x95\x9c\x3b\xe3\xf9\xd9\x6b\x4d"\
+	"\x2d\xa1\x62\x0a\x95\xee\xab\xb5\x8d\x3f\x3a\x1d\x38\x7c\xaf\x2c"\
+	"\x16\xae\xf0\xde\x9d\xc7\xb1\xd6\x79\x8c\x7a\xdd\x9f\x6f\xf2\xda"\
+	"\xc2\x55\x5e\x6f\xdf\xea\xb5\x93\xf5\x44\xf7\xea\xaf\x7d\x32\x50"\
+	"\xc1\x09\x7b\xde\x7d\x09\xd9\x7b\x87\xe9\xcb\x3c\xf3\xe8\xec\x22"\
+	"\x98\xed\x9f\xfa\xc2\xc2\xd3\x1e\xa9\x33\xf2\x57\xdf\x2e\x45\x58"\
+	"\x54\xdc\x5f\xfe\x76\x07\xeb\x0e\x9d\x73\xe9\xe6\x5f\xa0\x82\x0d"\
+	"\x4f\x62\xe5\xaf\x69\x3d\x15\x53\xd0\x5f\x77\xcd\x1a\xa1\x7d\xd7"\
+	"\xe5\xe0\xaf\x45\xdc\x17\xaa\xef\xe5\xac\x3d\xc9\x08\x15\x3d\x69"\
+	"\x1d\x15\x7b\xf2\xf4\x66\x86\xc4\x98\x9a\x5f\x35\x52\x10\xb1\x07"\
+	"\xf3\x7f\x5f\xbe\xc8\x70\xa9\xfc\x7b\x5c\xf3\x92\x2f\xfb\x4c\xa5"\
+	"\xae\x7e\xba\x38\x8f\xa7\xcf\x7f\x1f\x13\x54\xcf\x4a\x69\xdd\x33"\
+	"\xe9\x85\xa2\x1f\x4a\x36\xd6\x28\xb0\x43\xc5\x54\xd6\xef\xdc\x3d"\
+	"\xf9\xb8\xee\x81\x1d\x3b\xce\x3e\x81\xbb\x42\xf7\x2e\xff\xf7\xc7"\
+	"\x62\x0b\xe2\x73\x74\xe7\xbd\x42\x58\x98\x6d\xb2\xea\xa9\xd8\x02"\
+	"\x5b\x49\x99\xf9\x27\xe0\x82\x20\x13\x3f\x1a\x1c\xb8\x7c\xf4\x53"\
+	"\x23\x22\x0c\x9e\xbd\xf3\x93\xdb\xce\xf0\xf8\x91\xd9\x64\x66\xa8"\
+	"\xd8\xa4\xed\x25\xf6\x77\xfa\xa3\x1b\xea\x36\x6e\xad\x58\x05\xb7"\
+	"\xfa\xfd\x9a\x8b\x2b\xa6\x45\x37\x7c\x4b\x29\xa8\x51\x82\x0b\xe6"\
+	"\x6f\x31\x98\x7f\xf4\x30\x83\xbf\xf8\x69\x76\x44\x08\xcc\xda\x6d"\
+	"\x5d\x79\x87\xa9\xa7\xfb\xb6\x0f\x22\x4e\x2e\xad\x4f\x5c\x2a\xe4"\
+	"\xf4\xe2\x6b\xb7\xe3\xeb\x54\xb0\xd0\x0f\xf9\x9a\x35\x75\xf5\x5f"\
+	"\x1f\xaa\xf5\xd4\xed\xfb\xc1\xad\xb6\xcd\x69\xb2\xcf\x37\x26\x06"\
+	"\x00\x14\x69\xf9\x95\x72\x02\x00\x00"\
+	) | zcat | zcat | zcat > test.bin
