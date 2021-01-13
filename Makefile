@@ -15,32 +15,32 @@ endif
 
 all:
 ifeq ($(OS), Windows_NT)
-	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null || make --no-print-directory clean; exit 0)
+	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null || ${MAKE} --no-print-directory clean; exit 0)
 endif
-	@make --no-print-directory $(BINARY)
+	@${MAKE} --no-print-directory $(BINARY)
 
 64:
 ifeq ($(OS), Windows_NT)
-	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null && make --no-print-directory clean; exit 0)
-	@make --no-print-directory $(BINARY) 64=1
+	@(objdump -a $(BINARY) 2> /dev/null | grep "pei-i386" > /dev/null && ${MAKE} --no-print-directory clean; exit 0)
+	@${MAKE} --no-print-directory $(BINARY) 64=1
 else
-	@make --no-print-directory $(BINARY)
+	@${MAKE} --no-print-directory $(BINARY)
 endif
 
 clean:
 	rm -rf $(BINARY) $(CLEAN) crcutil.a *.o *.exe test.bin d1aa92b05d1f2638f423661ae4735446.bin
 
 mrproper:
-	@make --no-print-directory clean
+	@${MAKE} --no-print-directory clean
 	rm -rf test.bin *.tar.gz *.zip $(DISTNAME)-bin-win32 $(DISTNAME)-bin-win64
 
 dist:
-	make mrproper
+	${MAKE} mrproper
 	(cd ..; tar -cz --numeric-owner -f $(DISTNAME).tar.gz $(DISTNAME))
 	mv ../$(DISTNAME).tar.gz .
 ifeq ($(OS), Windows_NT)
 	mkdir $(DISTNAME)-bin-win32
-	make all
+	${MAKE} all
 	cp $(BINARY) $(DISTNAME)-bin-win32
 	cp README $(DISTNAME)-bin-win32/README.txt
 	cp COPYING $(DISTNAME)-bin-win32/COPYING.txt
@@ -48,9 +48,9 @@ ifeq ($(OS), Windows_NT)
 	unix2dos $(DISTNAME)-bin-win32/COPYING.txt
 	zip -r $(DISTNAME)-bin-win32.zip $(DISTNAME)-bin-win32
 	rm -rf $(DISTNAME)-bin-win32
-	make clean
+	${MAKE} clean
 	mkdir $(DISTNAME)-bin-win64
-	make all 64=1
+	${MAKE} all 64=1
 	cp $(BINARY) $(DISTNAME)-bin-win64
 	cp README $(DISTNAME)-bin-win64/README.txt
 	cp COPYING $(DISTNAME)-bin-win64/COPYING.txt
@@ -58,7 +58,7 @@ ifeq ($(OS), Windows_NT)
 	unix2dos $(DISTNAME)-bin-win64/COPYING.txt
 	zip -r $(DISTNAME)-bin-win64.zip $(DISTNAME)-bin-win64
 	rm -rf $(DISTNAME)-bin-win64
-	make clean
+	${MAKE} clean
 endif
 
 test: $(BINARY) test.bin
