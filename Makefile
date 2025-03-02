@@ -74,7 +74,7 @@ $(BINARY): findcrcs.cc md5.c md5.h crcutil-1.0 crcutil.a
 
 crcutil.a: crcutil-1.0
 	rm -rf *.o
-	$(BINPREFIX)g++ -O3 -Wall $(CXXFLAGS) -c crcutil-1.0/examples/interface.cc crcutil-1.0/code/*.cc -Icrcutil-1.0/code -Icrcutil-1.0/tests -Icrcutil-1.0/examples
+	$(BINPREFIX)g++ -O3 -Wall -msse4.2 $(CXXFLAGS) -c crcutil-1.0/examples/interface.cc crcutil-1.0/code/*.cc -Icrcutil-1.0/code -Icrcutil-1.0/tests -Icrcutil-1.0/examples
 	$(BINPREFIX)ar r crcutil.a *.o
 	rm -rf *.o
 
