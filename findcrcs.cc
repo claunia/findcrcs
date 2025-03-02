@@ -28,9 +28,6 @@
   These changes are released under the same license as the original md5.c file.
 */
 
-// Usage: findcrcs [-e] [-p PADDING] [-s SEEDFILE] [--] <FILE> <WINDOWSIZE> <CRC> [CRCS...]
-// code comments not included (yet, if ever)
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -275,7 +272,7 @@ void usage() {
 
 void findcrcs() {
   unsigned int i1;
-  int i2, fd1, fd2, readbytes, done;
+  int i2, fd1, fd2, readbytes;
   crcutil_interface::CRC *crcutil;
   unsigned long long crc;
   unsigned char buffer1[BUFFERSIZE], buffer2[BUFFERSIZE];
@@ -295,16 +292,30 @@ void findcrcs() {
     crcutil->Compute(&buffer1, (windowsize % BUFFERSIZE), &crc);
   }
 
-  done = 0;
-  if (!(single && checkcrcs((unsigned int)crc, 0))) {
-    for (i1 = 0; i1 < ((filesize - windowsize) / BUFFERSIZE) + 1; i1++) {
-      readbytes = read(fd1, &buffer1, BUFFERSIZE);
-      read(fd2, &buffer2, BUFFERSIZE);
-      for (i2 = 0; i2 < readbytes; i2++) {
-        crcutil->Roll(buffer2[i2], buffer1[i2], &crc, NULL);
-        if ((done = (single & checkcrcs((unsigned int)crc, (i1 * BUFFERSIZE) + i2 + 1))) == 1) break;
+  /* --- force check from offset 0 when not single --- */
+  if (checkcrcs((unsigned int)crc, 0)) {
+    if (single) {
+      close(fd2);
+      close(fd1);
+      crcutil->Delete();
+      return;
+    }
+  }
+
+  /* Continue scanning the rest of the file starting from offset 1 */
+  for (i1 = 0; i1 < ((filesize - windowsize) / BUFFERSIZE) + 1; i1++) {
+    readbytes = read(fd1, &buffer1, BUFFERSIZE);
+    read(fd2, &buffer2, BUFFERSIZE);
+    for (i2 = 0; i2 < readbytes; i2++) {
+      crcutil->Roll(buffer2[i2], buffer1[i2], &crc, NULL);
+      if (checkcrcs((unsigned int)crc, (i1 * BUFFERSIZE) + i2 + 1)) {
+        if (single) {
+          close(fd2);
+          close(fd1);
+          crcutil->Delete();
+          return;
+        }
       }
-      if (done) break;
     }
   }
 
@@ -315,7 +326,6 @@ void findcrcs() {
 
 int checkcrcs(unsigned int crc, int offset) {
   int i;
-
   for (i = 0; i < totalcrcs; i++) {
     if (crc == crcs[i].crc) {
       foundcrc(i, offset);
@@ -441,12 +451,10 @@ void extract_init(int offset) {
 
 int extract_read(void *buffer, unsigned int size) {
   unsigned int bytesread, returnvalue;
-
   if (size == 0 || extract_bytesleft == 0) return 0;
   if (size > extract_bytesleft) {
     size = extract_bytesleft;
   }
-
   returnvalue = 0;
   if (extract_offset < 0) {
     if ((unsigned int)(extract_offset * -1) >= size) {
@@ -463,7 +471,6 @@ int extract_read(void *buffer, unsigned int size) {
       extract_offset = 0;
     }
   }
-
   lseek(fd, extract_offset, SEEK_SET);
   bytesread = read(fd, buffer, size);
   extract_bytesleft -= bytesread;
@@ -477,6 +484,6 @@ int extract_read(void *buffer, unsigned int size) {
     extract_offset += size;
     returnvalue += size;
   }
-
   return returnvalue;
 }
+
