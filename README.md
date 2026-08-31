@@ -14,7 +14,7 @@ How:
  In a future version, this might be a selectable option of this program.
 
 Why:
- Useful for finding audio offsets in disk images together with the redump.org database.
+ Useful for finding audio offsets in disk images together with the Redump database.
 
 Warning:
  This software is not yet idiotproof!
@@ -37,6 +37,6 @@ Compiling:
  A small casting patch was made to support g++, this small patch is released under the same license as the original md5.c file.
 
 Contact:
- At the moment, see the redump.org forum thread where you got this.
+ At the moment, see the Redump forum thread where you got this.
 
 -V.
